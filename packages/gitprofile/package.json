@@ -1,0 +1,20 @@
+{
+  "name": "@cmdforge/gitprofile",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Combine gitconfig files for specific directories and corresponding SSH keys into a singular concept known as a gitprofile.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cmdforge/gitprofile.git"
+  },
+  "bin": {
+    "gitprofile": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test --import tsx src/**/*.test.ts"
+  },
+  "dependencies": {
+    "commander": "15.0.0"
+  }
+}

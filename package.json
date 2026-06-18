@@ -1,0 +1,22 @@
+{
+  "name": "gitprofile",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r build",
+    "prepare": "pnpm build",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.3",
+    "typescript": "^5.8.0",
+    "tsx": "4.22.4"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.5.3",
+      "onFail": "download"
+    }
+  }
+}
