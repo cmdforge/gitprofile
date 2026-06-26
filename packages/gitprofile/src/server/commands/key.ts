@@ -6,10 +6,10 @@ export function registerKeyCommands(parent: Command, services: CommandServices):
   const key = parent.command('key').description('Manage device-level SSH keys.');
 
   key
-    .command('create <name>')
+    .command('create <key-name>')
     .description('Create a new SSH key entry.')
-    .action(action(async (name: string) => {
-      await services.key.create({ name });
+    .action(action(async (keyName: string) => {
+      await services.key.create({ keyName });
     }));
 
   key
@@ -20,24 +20,24 @@ export function registerKeyCommands(parent: Command, services: CommandServices):
     }));
 
   key
-    .command('show <name>')
+    .command('show <key-name>')
     .description('Show an SSH key entry.')
-    .action(action(async (name: string) => {
-      await services.key.show(name);
+    .action(action(async (keyName: string) => {
+      await services.key.show(keyName);
     }));
 
   key
-    .command('rotate <name>')
+    .command('rotate <key-name>')
     .description('Rotate an SSH key entry.')
-    .action(action(async (name: string) => {
-      await services.key.rotate(name);
+    .action(action(async (keyName: string) => {
+      await services.key.rotate(keyName);
     }));
 
   key
-    .command('delete <name>')
+    .command('delete <key-name>')
     .description('Delete an SSH key entry.')
-    .action(action(async (name: string) => {
-      await services.key.delete(name);
+    .action(action(async (keyName: string) => {
+      await services.key.delete(keyName);
     }));
 
   return key;

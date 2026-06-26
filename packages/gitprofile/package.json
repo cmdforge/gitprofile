@@ -1,20 +1,36 @@
 {
   "name": "@cmdforge/gitprofile",
-  "version": "0.0.0",
+  "version": "0.0.2",
+  "license": "MIT",
   "type": "module",
+  "author": {
+    "name": "Fluttershy",
+    "url": "https://github.com/Fluttershy"
+  },
   "description": "Combine gitconfig files for specific directories and corresponding SSH keys into a singular concept known as a gitprofile.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cmdforge/gitprofile.git"
   },
+  "exports": {
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js"
+    }
+  },
   "bin": {
-    "gitprofile": "./dist/cli.js"
+    "gitprofile": "./dist/server/cli.js"
   },
   "scripts": {
     "build": "tsc",
     "test": "node --test --import tsx src/**/*.test.ts"
   },
   "dependencies": {
-    "commander": "15.0.0"
+    "commander": "15.0.0",
+    "@cmdforge/jsonrpc": "0.0.5"
   }
 }

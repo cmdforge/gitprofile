@@ -20,35 +20,34 @@ GitProfile manages a dedicated directory at:
 ~/.gitprofile
 ```
 
-Inside that directory, each profile is stored as:
+Inside that directory:
 
 ```text
-~/.gitprofile/{profile-name}.gitconfig
+~/.gitprofile/config
+~/.gitprofile/profiles/{profile-name}.gitconfig
+~/.gitprofile/keys/{key-name}.prv
+~/.gitprofile/keys/{key-name}.pub
+~/.gitprofile/ssh_config
 ```
 
-GitProfile also manages a device-level SSH key store at:
+Each profile is stored as:
 
 ```text
-~/.ssh/.gitprofile
+~/.gitprofile/profiles/{profile-name}.gitconfig
 ```
 
-That directory contains the named SSH key entries that profiles can point at.
+GitProfile also manages a device-level SSH key store under `~/.gitprofile/keys`.
 
 Each key entry should use a fixed naming convention:
 
 ```text
-{key-name}.prv
-{key-name}.pub
+~/.gitprofile/keys/{key-name}.prv
+~/.gitprofile/keys/{key-name}.pub
 ```
 
 The private key is the live key used by Git and SSH. The public key is the value that should be registered on the user's GitHub account.
 
-The same host identifier should be used everywhere the profile needs a stable label:
-
-- SSH host alias
-- GitHub SSH key title or display name
-- temporary working state
-- profile-specific bookkeeping
+The `host` identifier applies to a profile's SSH host alias.
 
 Profile names must be safe for filenames and SSH host aliases:
 
@@ -67,7 +66,7 @@ The GitHub login for the profile should be stored as the canonical account ident
 When a user creates a profile named `work`, GitProfile should create:
 
 ```text
-~/.gitprofile/work.gitconfig
+~/.gitprofile/profiles/work.gitconfig
 ```
 
 That file should contain the profile's Git identity, for example:
@@ -131,7 +130,7 @@ For each path string associated with a profile, GitProfile should add an include
 
 Conceptually:
 
-- one profile file lives in `~/.gitprofile/{profile-name}.gitconfig`
+- one profile file lives in `~/.gitprofile/profiles/{profile-name}.gitconfig`
 - many path strings may reference that same profile
 - each path string results in an include entry in `~/.gitconfig`
 
@@ -145,13 +144,7 @@ Each profile owns a host alias in the form:
 gitprofile-{profile-name}
 ```
 
-Each profile references a named key entry in:
-
-```text
-~/.ssh/.gitprofile
-```
-
-That key store should contain the SSH private key and public key for named key entries.
+Each profile references a named key entry in `~/.gitprofile/keys`.
 
 The intended host config shape is:
 
@@ -168,7 +161,7 @@ const hostConfig = {
 Where:
 
 - `host` is `gitprofile-{profile-name}`
-- `paths.keys.private` points to the private key inside `~/.ssh/.gitprofile/{key-name}.prv`
+- `paths.keys.private` points to the private key inside `~/.gitprofile/keys/{key-name}.prv`
 
 Example rendered SSH config:
 
@@ -176,7 +169,7 @@ Example rendered SSH config:
 Host gitprofile-work
   HostName github.com
   User git
-  IdentityFile ~/.ssh/.gitprofile/work-main.prv
+  IdentityFile ~/.gitprofile/keys/work-main.prv
   IdentitiesOnly yes
 ```
 
@@ -201,7 +194,7 @@ In practice, this enables workflows such as:
 - personal repositories using one name/email and one SSH identity
 - work repositories using another name/email and another SSH identity
 
-GitProfile should manage the SSH host entry in `~/.ssh/config` so the host alias points to the referenced key entry.
+GitProfile should manage the SSH host entry in `~/.gitprofile/ssh_config` so the host alias points to the referenced key entry. A small include shim in `~/.ssh/config` should point at `~/.gitprofile/ssh_config`.
 
 ### 7. GitHub account binding
 
@@ -233,7 +226,7 @@ GitProfile should manage SSH keys separately from profiles.
 The device-level key store lives under:
 
 ```text
-~/.ssh/.gitprofile
+~/.gitprofile/keys
 ```
 
 This directory is responsible for:
@@ -244,23 +237,7 @@ This directory is responsible for:
 
 The key management model should support a `key` command family so users can create, inspect, rotate, and remove named keys independently of profiles.
 
-### 9. Temporary working state
-
-Profile provisioning and key rotation should use a deterministic temporary directory under:
-
-```text
-~/.gitprofile/.tmp.{host}
-```
-
-Where `{host}` is the profile host identifier, for example:
-
-```text
-~/.gitprofile/.tmp.gitprofile-work
-```
-
-This directory should be used for in-progress files, staged metadata, and any recovery data needed to resume or clean up a failed provisioning/rotation step.
-
-### 10. Provisioning prerequisites
+### 9. Provisioning prerequisites
 
 Profile creation and key rotation should verify required tooling before making changes.
 
@@ -275,7 +252,7 @@ The check must be cross-platform. On Windows, use `where.exe`; on Unix-like syst
 
 The intent is to fail fast before partial profile creation begins.
 
-### 11. Key generation rules
+### 10. Key generation rules
 
 SSH key generation is part of profile provisioning.
 
@@ -288,7 +265,7 @@ Requirements:
 
 The public key should only be added or replaced on the user's GitHub account after all local setup succeeds.
 
-### 12. Key rotation
+### 11. Key rotation
 
 GitProfile should provide a command to rotate a named SSH key.
 
@@ -322,7 +299,6 @@ Notes:
 - each string maps to a conditional include rule in the global Git config
 - `host` is derived as `gitprofile-{profile-name}` and is not stored separately
 - `sshKeyName` is the named device-level key entry the profile uses
-- temporary state lives under `~/.gitprofile/.tmp.{host}`
 
 ## CLI Scope
 
@@ -330,13 +306,12 @@ The first implementation should be a Node.js CLI built with `commander`.
 
 Initial command surface:
 
-### `gitprofile create`
+### `create <profile-name>`
 
 Creates a new profile.
 
 Inputs:
 
-- profile name
 - key name
 - one or more path strings
 
@@ -345,14 +320,14 @@ Expected behavior:
 - verify required dependencies before doing anything else
 - resolve the authenticated GitHub account through `gh`
 - ensure `~/.gitprofile` exists
-- ensure `~/.ssh/.gitprofile` exists
-- write `~/.gitprofile/{profile-name}.gitconfig`
+- ensure `~/.gitprofile/keys` exists
+- write `~/.gitprofile/profiles/{profile-name}.gitconfig`
 - add the appropriate include rules to `~/.gitconfig`
-- create or register the SSH host entry in `~/.ssh/config`
-- attach the profile to a named key entry, defaulting to a shared key for the GitHub account if one already exists
-- register the public key with GitHub through `gh` using the same `host` identifier as the GitHub-facing key label
+- create or register the SSH host entry in `~/.gitprofile/ssh_config`
+- attach the profile to an existing named key entry
+- fail if the referenced key does not exist
 
-### `gitprofile list`
+### `list`
 
 Lists known profiles.
 
@@ -364,66 +339,74 @@ Expected behavior:
 - optionally show host alias and SSH key name
 - optionally show the bound GitHub login
 
-### `gitprofile show <name>`
+### `show <profile-name>`
 
 Displays one profile's stored settings.
 
 Expected behavior:
 
-- read `~/.gitprofile/{profile-name}.gitconfig`
+- read `~/.gitprofile/profiles/{profile-name}.gitconfig`
 - display resolved fields such as GitHub login, derived name, derived email, paths, host alias, and SSH key name
 
-### `gitprofile add-path <name> <path>`
+### `addPath <profile-name> <path...>`
 
-Adds a new path string to an existing profile.
+Adds one or more path strings to an existing profile.
 
 Expected behavior:
 
-- update the profile definition
+- update the profile definition with the added path strings
 - add the corresponding include rule to `~/.gitconfig`
-- optionally update the profile's referenced key name
 
-### `gitprofile remove-path <name> <path>`
+### `removePath <profile-name> <path...>`
 
-Removes a path string from an existing profile.
+Removes one or more path strings from an existing profile.
 
 Expected behavior:
 
-- update the profile definition
+- update the profile definition with the removed path strings
 - remove the corresponding include rule from `~/.gitconfig`
 
-### `gitprofile delete <name>`
+### `setKey <profile-name> <key-name>`
+
+Changes the named SSH key entry used by an existing profile.
+
+Expected behavior:
+
+- update the profile definition to reference the new key entry
+- ensure the new key entry exists before switching
+- leave unrelated profiles and key entries untouched
+
+### `delete <profile-name>`
 
 Deletes a profile.
 
 Expected behavior:
 
-- remove `~/.gitprofile/{profile-name}.gitconfig`
+- remove `~/.gitprofile/profiles/{profile-name}.gitconfig`
 - remove all related include rules from `~/.gitconfig`
 - remove the related host entry from `~/.ssh/config`
 - leave unrelated SSH config entries untouched
-- optionally remove the associated GitHub SSH key if the CLI can identify it safely
 
-### `gitprofile key create <key-name>`
+### `key create <key-name>`
 
 Initializes a named SSH keypair.
 
 Expected behavior:
 
-- ensure `~/.ssh/.gitprofile` exists
+- ensure `~/.gitprofile/keys` exists
 - create a no-passphrase keypair in that directory if one does not already exist
-- register the public key with GitHub after local generation succeeds using the same `host` identifier
+- register the public key with GitHub after local generation succeeds
 
-### `gitprofile key list`
+### `key list`
 
 Lists known SSH keys managed by GitProfile.
 
 Expected behavior:
 
-- inspect `~/.ssh/.gitprofile`
+- inspect `~/.gitprofile/keys`
 - show key names and associated GitHub labels if available
 
-### `gitprofile key show <key-name>`
+### `key show <key-name>`
 
 Displays one named SSH key entry's stored settings.
 
@@ -432,7 +415,7 @@ Expected behavior:
 - read the key entry metadata
 - display resolved fields such as GitHub label, file paths, and rotation state
 
-### `gitprofile key rotate <key-name>`
+### `key rotate <key-name>`
 
 Rotates a named SSH keypair.
 
@@ -441,10 +424,10 @@ Expected behavior:
 - generate a replacement keypair with the fixed key naming convention
 - leave the current key active until the new key is ready
 - update the key metadata to point at the replacement key
-- replace the key on GitHub only after the local replacement succeeds, using the same `host` identifier
+- replace the key on GitHub only after the local replacement succeeds
 - update the host entries that reference this key after the GitHub update succeeds
 
-### `gitprofile key delete <key-name>`
+### `key delete <key-name>`
 
 Deletes a named SSH key entry.
 
@@ -454,39 +437,24 @@ Expected behavior:
 - remove the GitHub key if it can be identified safely
 - fail if the key is still referenced by any profile unless forced
 
-### `gitprofile init-key <name>`
-
-Initializes a named SSH keypair for a profile as a convenience wrapper.
-
-Expected behavior:
-
-- ensure the referenced named key exists
-- attach the profile host entry to that key
-- register the public key with GitHub after local generation succeeds using the same `host` identifier
-
-### `gitprofile remote-url <name> <owner> <repo>`
-
-Builds the recommended SSH remote URL for a profile.
-
-Expected behavior:
-
-- derive the host alias from the profile name
-- output a URL such as `git@gitprofile-work:owner/repo.git`
-
-This command is optional for V1, but the remote URL pattern should be part of the documented model even if the command is deferred.
-
 ## File Responsibilities
 
-### `~/.gitprofile/{profile-name}.gitconfig`
+### `~/.gitprofile/config`
+
+Responsible for:
+
+- storing global GitProfile settings
+- recording any tool-owned defaults or shared configuration
+
+### `~/.gitprofile/profiles/{profile-name}.gitconfig`
 
 Responsible for:
 
 - storing profile-specific Git identity derived from GitHub
 - serving as the include target for matching Git rules
-- storing profile bookkeeping and recovery state in `~/.gitprofile/.tmp.{host}` during provisioning and rotation
 - storing the referenced SSH key name
 
-### `~/.ssh/.gitprofile`
+### `~/.gitprofile/keys`
 
 Responsible for:
 
@@ -494,12 +462,18 @@ Responsible for:
 - storing the matching public keys
 - storing key-level bookkeeping and recovery state
 
-### `~/.ssh/config`
+### `~/.gitprofile/ssh_config`
 
 Responsible for:
 
 - containing the managed `Host gitprofile-{profile-name}` entries
 - mapping each GitProfile host alias to its dedicated private key
+
+### `~/.ssh/config`
+
+Responsible for:
+
+- including `~/.gitprofile/ssh_config`
 
 ### `~/.gitconfig`
 
@@ -525,7 +499,7 @@ Requirements:
 - existing SSH keys should not be overwritten without explicit confirmation or a force flag
 - profile provisioning must not mutate the live SSH host entry until the new key has been generated successfully
 - the CLI must preserve enough state to recover from an interrupted key generation or rotation
-- the same `host` identifier must be used consistently across SSH config, GitHub key management, and temporary state
+- the same `host` identifier must be used consistently across SSH config and GitHub key management
 - a key may be referenced by multiple profiles
 - profile provisioning should not duplicate keys when an existing named key can be reused
 
@@ -535,21 +509,12 @@ These still need to be finalized before implementation:
 
 1. What exact Git conditional include mechanism should back "profile paths"?
 2. Should path strings support only directory matching, or also URL matching and SSH host alias matching?
-3. Where should the `paths` array be persisted?
-
-Options:
-
-- inside the profile `.gitconfig` as a custom section
-- in a separate metadata file under `~/.gitprofile`
-- in both, with one canonical source of truth
+3. The `paths` array should be persisted inside each profile's `.gitconfig` as a custom GitProfile section.
 
 4. How should GitProfile mark entries in `~/.gitconfig` so they can be updated safely later?
 5. How should GitProfile mark entries in `~/.ssh/config` so they can be updated safely later?
 6. Should `create` be interactive, flags-only, or support both?
-7. Should delete remove the GitHub SSH key automatically, or only local files and config?
-8. Should the temporary `.tmp.{host}` directory be cleaned automatically on success, or retained for debugging?
-9. Should `key create` be able to import an existing local key instead of always generating a fresh one?
-
+7. Recovery should use `.bak` renames during atomic replace/move operations.
 ## Proposed Implementation Direction
 
 For the first draft:
@@ -559,11 +524,12 @@ For the first draft:
 - generate one `.gitconfig` file per profile
 - maintain deterministic, tool-owned include entries in the global `~/.gitconfig`
 - maintain deterministic, tool-owned host entries in `~/.ssh/config`
-- maintain one device-level SSH key store under `~/.ssh/.gitprofile`
+- maintain one device-level SSH key store under `~/.gitprofile/keys`
 - validate required external binaries before provisioning
-- use the same host identifier across GitHub, SSH, and temporary state
+- use the same host identifier across profile SSH host entries
 - resolve author identity from the linked GitHub login instead of asking for separate `user.name` and `user.email`
 - allow profiles to reuse a named SSH key instead of duplicating key material
+- use `.bak` renames when replacing staged files into place
 - keep the implementation focused on local Git and SSH config orchestration
 
 ## Non-Goals For V1
@@ -575,6 +541,6 @@ For the first draft:
 
 ## Summary
 
-`gitprofile` is a CLI for defining named GitHub-backed Git identities and associating them with multiple path rules and a dedicated SSH host alias. Each profile is stored as its own config file under `~/.gitprofile`, `~/.ssh/.gitprofile` stores named device-level SSH keys, `~/.gitprofile/.tmp.{host}` stores temporary in-progress state, the user's global `~/.gitconfig` contains the conditional rules that include those profile configs, and `~/.ssh/config` contains a managed host entry that selects the referenced SSH key for Git remotes such as `git@gitprofile-work:owner/repo.git`.
+`gitprofile` is a CLI for defining named GitHub-backed Git identities and associating them with multiple path rules and a dedicated SSH host alias. Each profile is stored as its own config file under `~/.gitprofile/profiles`, `~/.gitprofile/keys` stores named device-level SSH keys, `~/.gitprofile/config` stores global GitProfile settings, `~/.gitprofile/ssh_config` contains managed host entries, the user's global `~/.gitconfig` contains the conditional rules that include those profile configs, and `~/.ssh/config` contains a tiny include shim that points at `~/.gitprofile/ssh_config`.
 
-The immediate next step after this spec is to finalize the exact include-rule format, decide whether profiles should always point at an explicit named key or can default to a shared per-account key, and define the exact GitHub SSH key registration flow through `gh` so provisioning and rotation can be made atomic enough to recover from partial failures.
+The immediate next step after this spec is to finalize the exact include-rule format and define the GitHub SSH key registration flow through `gh` so provisioning and rotation can be made atomic enough to recover from partial failures.
